@@ -6,9 +6,4 @@ Automated single-node deployment tool for Kaspersky Next XDR Expert, KUMA, Postg
 
 Run the following command on a fresh Ubuntu server as root:
 
-```bash
-mkdir -p /root/XDR && cd /root/XDR && \
-curl -sSL -O https://raw.githubusercontent.com/sherifmohamed5/kaspersky-xdr-automation/main/xdr_all_in_one.sh && \
-curl -sSL -O https://raw.githubusercontent.com/sherifmohamed5/kaspersky-xdr-automation/main/config.env && \
-chmod +x xdr_all_in_one.sh && \
-./xdr_all_in_one.sh
+bash <(curl -sSL https://raw.githubusercontent.com/sherifmohamed5/kaspersky-xdr-automation/main/start.sh)
