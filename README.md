@@ -12,22 +12,3 @@ curl -sSL -O [https://raw.githubusercontent.com/](https://raw.githubusercontent.
 curl -sSL -O [https://raw.githubusercontent.com/](https://raw.githubusercontent.com/)<YOUR_USERNAME>/kaspersky-xdr-automation/main/config.env && \
 chmod +x xdr_all_in_one.sh && \
 ./xdr_all_in_one.sh
-
-
----
-
-sudo passwd root
-
-Ka5per$Ky
-Ka5per$Ky
-su - root
-Ka5per$Ky
-mkdir script
-cd script
-
-curl -L "https://box.kaspersky.com/seafhttp/f/742909caf9b74d66826b/?op=view" -o xdr_all_in_one.sh -L "https://box.kaspersky.com/seafhttp/f/6848c1ef2f7d4cbd99d1/?op=view" -o config.env
-
-chmod +x xdr_all_in_one.sh
-
-./xdr_all_in_one.sh
-
