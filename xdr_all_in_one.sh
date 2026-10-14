@@ -1,9 +1,9 @@
 #!/bin/bash
 # ==============================================================
-#  Kaspersky Next XDR & KUMA All-in-One Automated Installer
-#  Release: Final Delivery (PoC Edition)
+#  Kaspersky Next XDR 2.3 & KUMA All-in-One Automated Installer
+#  Release: Final Delivery (PoC Edition - v2.3)
 #  Status:  VERIFIED & WORKING (EDR - Ubuntu 22.04 / 24.04 LTS)
-#  Updated: 2026-08-28
+#  Updated: 2026-10-14
 #  Location: /root/XDR/xdr_all_in_one.sh
 #  Created by: Sherif Saleh
 # 
@@ -56,8 +56,8 @@ PLUGIN_TAR_URL=""
 LICENSE_URL=""
 DEFAULT_HOST_IP=""
 DEFAULT_INGRESS_IP=""
-DEFAULT_DOMAIN_NAME="smp.subdomain.local"
-DEFAULT_HOST_DOMAIN="xdr.subdomain.local"
+DEFAULT_DOMAIN_NAME="smp.local"
+DEFAULT_HOST_DOMAIN="xdr.local"
 ALL_SERVICES_IN_CLUSTER=""
 UNIFIED_PASSWORD=""
 CONFEOF
@@ -66,6 +66,16 @@ fi
 
 TARGET_DIR="${TARGET_DIR:-/root/XDR}"
 mkdir -p "$TARGET_DIR"
+
+# Dynamically resolve archive filenames from URLs (defaulting to 2.3 filenames)
+BIN_FILE_NAME=$(basename "${BIN_URL%%\?*}" 2>/dev/null)
+BIN_FILE_NAME="${BIN_FILE_NAME:-bin.tar.gz}"
+
+XDR_TAR_NAME=$(basename "${XDR_TAR_URL%%\?*}" 2>/dev/null)
+XDR_TAR_NAME="${XDR_TAR_NAME:-xdr-2.3.281-en.tar}"
+
+PLUGIN_TAR_NAME=$(basename "${PLUGIN_TAR_URL%%\?*}" 2>/dev/null)
+PLUGIN_TAR_NAME="${PLUGIN_TAR_NAME:-plugin-kesw_14.1.0.7445.tar}"
 
 if [ "$(id -u)" != "0" ]; then
     echo -e "${RED}Error: This script must be run as root (or with sudo).${NC}" 1>&2
@@ -119,12 +129,21 @@ download_if_missing() {
     if [ -s "$file_path" ]; then
         echo -e "  ${YELLOW}✔ [SKIPPED]${NC} $file_name already exists ($(du -h "$file_path" | cut -f1))"
     else
+        if [ -z "$url" ]; then
+            echo -e "  ${RED}✖ URL for $file_name is empty in config.env.${NC}"
+            exit 1
+        fi
         echo -e "  ${CYAN}==> Downloading $file_name...${NC}"
-        curl -C - -L -o "$file_path" "$url"
+        if ! curl -f -C - -L -o "$file_path" "$url"; then
+            echo -e "  ${YELLOW}⚠ Resume failed or unsupported, retrying fresh download for $file_name...${NC}"
+            rm -f "$file_path"
+            curl -f -L -o "$file_path" "$url"
+        fi
         if [ -s "$file_path" ]; then
-            echo -e "  ${GREEN}✔ Downloaded $file_name successfully.${NC}"
+            echo -e "  ${GREEN}✔ Downloaded $file_name successfully ($(du -h "$file_path" | cut -f1)).${NC}"
         else
             echo -e "  ${RED}✖ Failed to download $file_name.${NC}"
+            rm -f "$file_path"
             exit 1
         fi
     fi
@@ -270,7 +289,7 @@ PYUPLOAD
 # ==============================================================
 echo -e "${CYAN}${BOLD}"
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║    Kaspersky Next XDR & KUMA All-in-One Installer          ║"
+echo "║    Kaspersky Next XDR 2.3 & KUMA All-in-One Installer      ║"
 echo "║    Status: VERIFIED & WORKING (EDR - Ubuntu 22.04/24.04)   ║"
 echo "║                                                            ║"
 echo "║    [!] NOTICE: THIS SCRIPT IS STRICTLY DESIGNED FOR        ║"
@@ -321,13 +340,13 @@ while true; do
     fi
 done
 
-SUGG_DOMAIN="${DEFAULT_DOMAIN_NAME:-smp.local}"
+SUGG_DOMAIN=$(echo "${DEFAULT_DOMAIN_NAME:-smp.local}" | tr '[:upper:]' '[:lower:]')
 read -rp "$(echo -e "${BOLD}3. SMP Service Domain Name${NC} [${YELLOW}$SUGG_DOMAIN${NC}]: ")" input_domain
-DOMAIN_NAME="${input_domain:-$SUGG_DOMAIN}"
+DOMAIN_NAME=$(echo "${input_domain:-$SUGG_DOMAIN}" | tr '[:upper:]' '[:lower:]')
 
-SUGG_HOST_DOM="${DEFAULT_HOST_DOMAIN:-$DOMAIN_NAME}"
+SUGG_HOST_DOM=$(echo "${DEFAULT_HOST_DOMAIN:-$DOMAIN_NAME}" | tr '[:upper:]' '[:lower:]')
 read -rp "$(echo -e "${BOLD}4. Host Domain Name (Machine FQDN & Inventory)${NC} [${YELLOW}$SUGG_HOST_DOM${NC}]: ")" input_host_domain
-HOST_DOMAIN="${input_host_domain:-$SUGG_HOST_DOM}"
+HOST_DOMAIN=$(echo "${input_host_domain:-$SUGG_HOST_DOM}" | tr '[:upper:]' '[:lower:]')
 
 if [ -z "$ALL_SERVICES_IN_CLUSTER" ]; then
     read -rp "$(echo -e "${BOLD}5. Are all KUMA services installed inside the Kubernetes cluster? [Y/n]: ${NC}")" input_cluster_services
@@ -451,13 +470,13 @@ else
 fi
 
 # ==============================================================
-# STEP 3: Smart Downloader
+# STEP 3: Smart Downloader (XDR 2.3 Packages)
 # ==============================================================
 echo -e "\n${GREEN}${BOLD}[3/5] Checking Distribution Packages in $TARGET_DIR...${NC}"
 
-download_if_missing "bin.tar.gz" "$BIN_URL"
-download_if_missing "xdr-2.2.448-en.tar" "$XDR_TAR_URL"
-download_if_missing "plugin-kesw_14.1.0.6225.tar" "$PLUGIN_TAR_URL"
+download_if_missing "$BIN_FILE_NAME" "$BIN_URL"
+download_if_missing "$XDR_TAR_NAME" "$XDR_TAR_URL"
+download_if_missing "$PLUGIN_TAR_NAME" "$PLUGIN_TAR_URL"
 download_if_missing "license.key" "$LICENSE_URL"
 
 # ==============================================================
@@ -589,8 +608,8 @@ else
     echo -e "  ${YELLOW}⚠ Warning: Local SSH key self-test could not verify immediate login.${NC}"
 fi
 
-# 10. Required Packages & Chrony
-apt-get install -y -qq curl docker.io python3 chrony sshpass >/dev/null 2>&1
+# 10. Required OSMP & Cluster Packages & Chrony
+apt-get install -y -qq curl tar docker.io python3 chrony sshpass nfs-common open-iscsi wireguard wireguard-tools >/dev/null 2>&1
 systemctl enable --now chrony >/dev/null 2>&1 || true
 
 # 11. PostgreSQL 16 Installation & Tuning
@@ -627,6 +646,7 @@ ALTER SYSTEM SET effective_cache_size = '4GB';
 ALTER SYSTEM SET maintenance_work_mem = '128MB';
 ALTER SYSTEM SET work_mem = '16MB';
 ALTER SYSTEM SET temp_buffers = '24MB';
+ALTER SYSTEM SET max_stack_depth = '7MB';
 ALTER SYSTEM SET max_parallel_workers_per_gather = 0;
 ALTER SYSTEM SET max_connections = '512';
 EOF
@@ -677,7 +697,7 @@ else:
     inventory_val = inventory_file
     license_val = license_file
 
-# 1. singlenode.smp_param_<RAND_ID>.yaml (Clean KDT 2.2 schema)
+# 1. singlenode.smp_param_<RAND_ID>.yaml (KDT 2.3 schema)
 smp_param_content = f"""# For more information about the installation parameters listed below, refer to Online Help.
 schemaType: ParameterSet
 schemaVersion: 1.0.1
@@ -784,13 +804,13 @@ print(f"  ✔ Created Parameter YAML: {smp_param_file}")
 PYEOF
 
 SMP_PARAM_FILE="$TARGET_DIR/singlenode.smp_param_${RAND_ID}.yaml"
-XDR_TAR=$(ls -t "$TARGET_DIR"/xdr-*.tar 2>/dev/null | head -n 1)
-if [ -z "$XDR_TAR" ]; then
-    XDR_TAR="$TARGET_DIR/xdr-2.2.448-en.tar"
+XDR_TAR="$TARGET_DIR/$XDR_TAR_NAME"
+if [ ! -f "$XDR_TAR" ]; then
+    XDR_TAR=$(ls -t "$TARGET_DIR"/xdr-2.3*.tar "$TARGET_DIR"/xdr-*.tar 2>/dev/null | head -n 1)
 fi
 
 cd "$TARGET_DIR"
-tar -xvf "$TARGET_DIR/bin.tar.gz" -C "$TARGET_DIR"
+tar -xvf "$TARGET_DIR/$BIN_FILE_NAME" -C "$TARGET_DIR"
 
 if [ -f "$TARGET_DIR/bin/kdt" ]; then
     mv -f "$TARGET_DIR/bin/kdt" "$TARGET_DIR/kdt"
@@ -809,7 +829,7 @@ else
 fi
 
 echo -e "\n${CYAN}${BOLD}=============================================================="
-echo " Ready to deploy Kaspersky Next XDR Single-Node Cluster"
+echo " Ready to deploy Kaspersky Next XDR 2.3 Single-Node Cluster"
 echo " Location:         $TARGET_DIR"
 echo " Package Archive:  $XDR_TAR"
 echo " Parameter File:   $SMP_PARAM_FILE"
